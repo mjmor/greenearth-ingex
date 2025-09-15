@@ -16,6 +16,11 @@ A data ingestion and indexing system for BlueSky content. This project provides 
 
 ## Development & Deployment
 
+### Repository Structure
+
+- `/ingest` - All code related to the Go-based ingestion service.
+- `/index` - All code related to the Elastic Search index and query service.
+
 ### Continuous Integration (Github Actions)
 - **Testing**: (TODO) Go test suites on all pull requests
 - **Quality Assurance**: (TODO) Automated linting, formatting, and security checks
