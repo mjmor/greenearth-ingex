@@ -53,3 +53,30 @@ cd greenearth-ingex
 # Run tests
 go test ./...
 ```
+
+#### Testing with Live BlueSky Data
+
+You can connect directly to the BlueSky TurboStream websocket to capture live data for testing the ingestion service:
+
+```bash
+# Install websocat if not already available
+# brew install websocat  # macOS
+# sudo apt install websocat  # Ubuntu
+
+# Connect to websocket and capture all events
+websocat "wss://api.graze.social/app/api/v1/turbostream/turbostream"
+
+# Filter out posts to focus on other event types
+websocat "wss://api.graze.social/app/api/v1/turbostream/turbostream" | grep -v '"collection": "app.bsky.feed.post"'
+
+# Filter out multiple event types (posts, identity, account events)
+websocat "wss://api.graze.social/app/api/v1/turbostream/turbostream" | grep -v -E '"collection": "app.bsky.feed.post"|"kind": "identity"|"kind": "account"'
+
+# Save filtered data to file for testing
+websocat "wss://api.graze.social/app/api/v1/turbostream/turbostream" | grep -v '"collection": "app.bsky.feed.post"' > test_data.jsonl
+
+# Format specific lines for inspection
+sed -n '2p' test_data.jsonl | python -m json.tool
+```
+
+This live data can be used to test different scenarios and edge cases in the ingestion pipeline.

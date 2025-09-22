@@ -1,0 +1,62 @@
+{
+    "at_uri": "",
+    "did": "did:plc:o3urktvuvn65ppjp65ruxpxr",
+    "time_us": null,
+    "message": {
+        "did": "did:plc:o3urktvuvn65ppjp65ruxpxr",
+        "time_us": 1758504360644658,
+        "kind": "identity",
+        "identity": {
+            "did": "did:plc:o3urktvuvn65ppjp65ruxpxr",
+            "handle": "ryusan11.bsky.social",
+            "seq": 13609125934,
+            "time": "2025-09-22T01:26:00.379Z"
+        }
+    },
+    "hydrated_metadata": {
+        "user": {
+            "did": "did:plc:o3urktvuvn65ppjp65ruxpxr",
+            "handle": "ryusan11.bsky.social",
+            "associated": {
+                "chat": null,
+                "feedgens": 0,
+                "labeler": false,
+                "lists": 0,
+                "starter_packs": 0,
+                "py_type": "app.bsky.actor.defs#profileAssociated",
+                "activitySubscription": {
+                    "allowSubscriptions": "followers"
+                }
+            },
+            "avatar": null,
+            "banner": null,
+            "created_at": "0001-01-01T00:00:00.000Z",
+            "description": null,
+            "display_name": null,
+            "followers_count": 0,
+            "follows_count": 0,
+            "indexed_at": null,
+            "joined_via_starter_pack": null,
+            "labels": [],
+            "pinned_post": null,
+            "posts_count": 0,
+            "verification": null,
+            "viewer": {
+                "blocked_by": false,
+                "blocking": null,
+                "blocking_by_list": null,
+                "followed_by": null,
+                "following": null,
+                "known_followers": null,
+                "muted": false,
+                "muted_by_list": null,
+                "py_type": "app.bsky.actor.defs#viewerState"
+            },
+            "py_type": "app.bsky.actor.defs#profileViewDetailed"
+        },
+        "mentions": {},
+        "parent_post": null,
+        "reply_post": null,
+        "quote_post": null
+    }
+}
