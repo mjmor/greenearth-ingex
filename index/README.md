@@ -10,9 +10,13 @@ index/
 └── deploy/                            # Deployment configurations
     ├── terraform/                     # Terraform IaC (TODO)
     └── k8s/                          # Kubernetes manifests
+        ├── templates/                # Index templates and aliases
+        │   ├── posts-index-template.yaml
+        │   └── posts-alias.yaml
         └── environments/
             ├── local/                # Local development environment
-            │   └── elasticsearch.yaml
+            │   ├── elasticsearch.yaml
+            │   └── bootstrap-job.yaml
             ├── staging/              # Staging environment (TODO)
             └── production/           # Production environment
                 └── elasticsearch.yaml
@@ -69,7 +73,17 @@ kubectl create namespace greenearth-local
 kubectl apply -f deploy/k8s/environments/local/elasticsearch.yaml
 ```
 
-### 3. Monitor Deployment
+### 3. Deploy Index Templates and Bootstrap Schema
+
+```bash
+# Deploy ConfigMaps for index templates and aliases
+kubectl apply -f deploy/k8s/templates/
+
+# Deploy bootstrap job to apply templates to Elasticsearch
+kubectl apply -f deploy/k8s/environments/local/bootstrap-job.yaml
+```
+
+### 4. Monitor Deployment
 
 ```bash
 # Check cluster status
@@ -78,13 +92,20 @@ kubectl get elasticsearch -n greenearth-local
 # Check pod status
 kubectl get pods -n greenearth-local
 
-# View logs if needed
+# Check bootstrap job status
+kubectl get jobs -n greenearth-local
+
+# View Elasticsearch logs if needed
 kubectl logs greenearth-es-local-es-default-0 -n greenearth-local
+
+# View bootstrap job logs
+kubectl logs -l job-name=elasticsearch-bootstrap -n greenearth-local
 ```
 
 Wait for status to show:
-- **HEALTH**: `green`
-- **PHASE**: `Ready`
+- **Elasticsearch HEALTH**: `green`
+- **Elasticsearch PHASE**: `Ready`
+- **Bootstrap Job COMPLETIONS**: `1/1`
 
 ## Testing Local Infrastructure
 
@@ -95,34 +116,35 @@ Wait for status to show:
 kubectl port-forward service/greenearth-es-local-es-http 9200 -n greenearth-local
 ```
 
-### 2. Get Authentication Credentials
+### 2. Test API Endpoints
 
 ```bash
-# Get the auto-generated elastic user password
-kubectl get secret greenearth-es-local-es-elastic-user -o go-template='{{.data.elastic | base64decode}}' -n greenearth-local
-```
-
-### 3. Test API Endpoints
-
-```bash
-# Test basic connectivity
-curl -u "elastic:YOUR_PASSWORD" -X GET "localhost:9200/"
+# Test basic connectivity (no authentication required in local)
+curl -X GET "localhost:9200/"
 
 # Check cluster health
-curl -u "elastic:YOUR_PASSWORD" -X GET "localhost:9200/_cluster/health"
+curl -X GET "localhost:9200/_cluster/health"
+
+# Verify index templates and aliases are applied
+curl -X GET "localhost:9200/_index_template/posts_template"
+curl -X GET "localhost:9200/_alias/posts"
 ```
 
 Expected responses:
 - **Basic connectivity**: Elasticsearch version info and tagline
 - **Cluster health**: `status: "green"`, `number_of_nodes: 1`
+- **Index template**: Shows posts_template configuration with schema
+- **Alias**: Shows `posts` alias pointing to `posts_v1` index
 
-### 4. Health Check Verification
+### 3. Health Check Verification
 
 A healthy local deployment should show:
 - ✅ Cluster status: `green`
 - ✅ Number of nodes: `1`
 - ✅ Number of data nodes: `1`
-- ✅ Active shards: `3` (system indices)
+- ✅ Bootstrap job completed: `1/1`
+- ✅ Posts index template applied
+- ✅ Posts alias configured: `posts` → `posts_v1`
 - ✅ API responding with version `9.0.0`
 
 ## Cleanup
