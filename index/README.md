@@ -336,16 +336,17 @@ This may take 5-10 minutes for first deployment.
 kubectl apply -f deploy/k8s/environments/stage/templates/
 ```
 
-### 9. Create Service User Password Secret
+### 9. Create Service User Credentials Secret
 
 **IMPORTANT**: This secret must be created before running the service user setup job.
 
 ```bash
-# Generate a secure random password
-ES_SERVICE_PASSWORD=$(openssl rand -base64 32)
+# Generate a secure alphanumeric password (avoid special characters for simplicity)
+ES_SERVICE_PASSWORD=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 24)
 
-# Create the Kubernetes secret
-kubectl create secret generic es-service-user-password \
+# Create the Kubernetes secret with both username and password
+kubectl create secret generic es-service-user-secret \
+  --from-literal=username="es-service-user" \
   --from-literal=password="$ES_SERVICE_PASSWORD" \
   -n greenearth-stage
 ```
@@ -361,8 +362,7 @@ kubectl apply -f deploy/k8s/environments/stage/es-service-user-setup-job.yaml
 This job:
 - Waits for Elasticsearch to be ready
 - Creates `es_service_role` with index template and posts index permissions
-- Creates `es-service-user` with the role
-- Stores credentials in `es-service-user-secret` Kubernetes secret
+- Creates the service user (using credentials from `es-service-user-secret`) with the role
 
 Monitor the job:
 ```bash

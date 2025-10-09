@@ -13,10 +13,6 @@ spec:
       node.store.allow_mmap: true
     podTemplate:
       spec:
-        initContainers:
-        - name: sysctl-check
-          image: docker.io/bash:5.2.21
-          command: ['sh', '-c', 'sysctl vm.max_map_count']
         containers:
         - name: elasticsearch
           resources:

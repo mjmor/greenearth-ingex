@@ -16,10 +16,15 @@ spec:
             secretKeyRef:
               name: greenearth-es-stage-es-elastic-user
               key: elastic
+        - name: ES_SERVICE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: es-service-user-secret
+              key: username
         - name: ES_SERVICE_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: es-service-user-password
+              name: es-service-user-secret
               key: password
         command:
         - /bin/sh
@@ -53,8 +58,8 @@ spec:
           echo ""
           echo "Role created successfully!"
 
-          # Create the es-service-user with the role
-          curl -k -X POST "https://greenearth-es-stage-es-http:9200/_security/user/es-service-user" \
+          # Create the service user with the role
+          curl -k -X POST "https://greenearth-es-stage-es-http:9200/_security/user/$ES_SERVICE_USERNAME" \
             -u "elastic:$ELASTIC_PASSWORD" \
             -H "Content-Type: application/json" \
             -d "{
@@ -66,21 +71,6 @@ spec:
 
           echo ""
           echo "User created successfully!"
-
-          # Create Kubernetes secret with the service user credentials
-          cat <<EOF | kubectl apply -f -
-          apiVersion: v1
-          kind: Secret
-          metadata:
-            name: es-service-user-secret
-            namespace: greenearth-stage
-          type: Opaque
-          stringData:
-            username: es-service-user
-            password: $ES_SERVICE_PASSWORD
-          EOF
-
-          echo "Kubernetes secret created successfully!"
           echo "es-service-user setup completed!"
       serviceAccountName: es-service-user-setup-sa
 ---
