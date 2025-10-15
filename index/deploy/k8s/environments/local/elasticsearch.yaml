@@ -11,7 +11,6 @@ spec:
     config:
       node.roles: ["master", "data", "ingest"]
       node.store.allow_mmap: false
-      xpack.security.enabled: false
     podTemplate:
       spec:
         containers:
@@ -35,7 +34,3 @@ spec:
         resources:
           requests:
             storage: 5Gi
-  http:
-    tls:
-      selfSignedCertificate:
-        disabled: true

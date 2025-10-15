@@ -8,10 +8,6 @@ spec:
   count: 1
   elasticsearchRef:
     name: greenearth-es-local
-  http:
-    tls:
-      selfSignedCertificate:
-        disabled: true
   podTemplate:
     spec:
       containers:

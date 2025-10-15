@@ -10,6 +10,12 @@ spec:
       containers:
       - name: bootstrap
         image: curlimages/curl:8.4.0
+        env:
+        - name: ES_SERVICE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: es-service-user-secret
+              key: password
         command:
         - /bin/sh
         - -c
@@ -18,7 +24,7 @@ spec:
           echo "Waiting for Elasticsearch to be ready..."
 
           # Wait for Elasticsearch to be available
-          until curl -s -o /dev/null -w "%{http_code}" http://greenearth-es-local-es-http:9200/ | grep -q "200"; do
+          until curl -k -s -u "es-service-user:$ES_SERVICE_PASSWORD" -o /dev/null -w "%{http_code}" https://greenearth-es-local-es-http:9200/ | grep -q "200"; do
             echo "Waiting for Elasticsearch..."
             sleep 10
           done
@@ -26,18 +32,21 @@ spec:
           echo "Elasticsearch is ready! Applying index templates..."
 
           # Apply posts index template
-          curl -X PUT "http://greenearth-es-local-es-http:9200/_index_template/posts_template" \
+          curl -k -X PUT "https://greenearth-es-local-es-http:9200/_index_template/posts_template" \
+            -u "es-service-user:$ES_SERVICE_PASSWORD" \
             -H "Content-Type: application/json" \
             -d @/templates/posts-index-template.json
 
           echo "Index template applied successfully!"
 
           # Create initial index to establish alias
-          curl -X PUT "http://greenearth-es-local-es-http:9200/posts_v1" \
+          curl -k -X PUT "https://greenearth-es-local-es-http:9200/posts_v1" \
+            -u "es-service-user:$ES_SERVICE_PASSWORD" \
             -H "Content-Type: application/json"
 
           # Apply alias
-          curl -X POST "http://greenearth-es-local-es-http:9200/_aliases" \
+          curl -k -X POST "https://greenearth-es-local-es-http:9200/_aliases" \
+            -u "es-service-user:$ES_SERVICE_PASSWORD" \
             -H "Content-Type: application/json" \
             -d @/aliases/posts-alias.json
 
