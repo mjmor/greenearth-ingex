@@ -197,10 +197,7 @@ kubectl apply -f deploy/k8s/environments/stage/templates/
 
 **Local:**
 ```bash
-# Generate a secure alphanumeric password
-ES_SERVICE_PASSWORD=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 24)
-
-# Create the Kubernetes secret with both username and password
+# Create the Kubernetes secret with both username and password (password should come from .env file)
 kubectl create secret generic es-service-user-secret \
   --from-literal=username="es-service-user" \
   --from-literal=password="$ES_SERVICE_PASSWORD" \
@@ -209,17 +206,12 @@ kubectl create secret generic es-service-user-secret \
 
 **Stage:**
 ```bash
-# Generate a secure alphanumeric password
-ES_SERVICE_PASSWORD=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 24)
-
-# Create the Kubernetes secret with both username and password
+# Create the Kubernetes secret with both username and password (password should come from .env file)
 kubectl create secret generic es-service-user-secret \
   --from-literal=username="es-service-user" \
   --from-literal=password="$ES_SERVICE_PASSWORD" \
   -n greenearth-stage
 ```
-
-**Note**: This secret is NOT committed to source control. Store the password securely if you need to access it later.
 
 ### 10. Create Service Account User
 

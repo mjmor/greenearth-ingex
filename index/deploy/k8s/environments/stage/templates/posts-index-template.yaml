@@ -42,7 +42,7 @@ data:
             },
             "created_at": {
               "type": "date",
-              "format": "date_time||epoch_millis"
+              "format": "iso8601"
             },
             "thread_root_post": {
               "type": "keyword",
@@ -75,7 +75,7 @@ data:
             },
             "indexed_at": {
               "type": "date",
-              "format": "date_time||epoch_millis"
+              "format": "iso8601"
             }
           }
         }
