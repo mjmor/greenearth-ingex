@@ -9,6 +9,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// TODO: Abstract WebSocketClient interface to a general DataSource interface
+// Create separate implementations for:
+// 1. WebSocketDataSource - for real-time websocket streams (this file)
+// 2. LocalSQLiteDataSource - for local SQLite file ingestion
+// 3. S3SQLiteDataSource - for remote SQLite files hosted on S3
+// All implementations should provide a common interface for reading messages
+
 // TurboStreamClient implements the WebSocketClient interface for TurboStream connections
 type TurboStreamClient struct {
 	conn   *websocket.Conn

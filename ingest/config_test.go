@@ -12,14 +12,6 @@ func TestLoadConfig_Defaults(t *testing.T) {
 
 	config := LoadConfig()
 
-	if config.TurboStreamURL != "wss://graze.social/turbostream" {
-		t.Errorf("Expected default TurboStreamURL, got %s", config.TurboStreamURL)
-	}
-
-	if config.ElasticsearchURL != "http://localhost:9200" {
-		t.Errorf("Expected default ElasticsearchURL, got %s", config.ElasticsearchURL)
-	}
-
 	if config.WebSocketWorkers != 3 {
 		t.Errorf("Expected default WebSocketWorkers to be 3, got %d", config.WebSocketWorkers)
 	}
@@ -34,10 +26,6 @@ func TestLoadConfig_Defaults(t *testing.T) {
 
 	if !config.LoggingEnabled {
 		t.Error("Expected default LoggingEnabled to be true")
-	}
-
-	if config.Port != "8080" {
-		t.Errorf("Expected default Port to be 8080, got %s", config.Port)
 	}
 }
 
@@ -77,10 +65,6 @@ func TestLoadConfig_FromEnvironment(t *testing.T) {
 
 	if config.LoggingEnabled {
 		t.Error("Expected LoggingEnabled from env to be false")
-	}
-
-	if config.Port != "3000" {
-		t.Errorf("Expected Port from env to be 3000, got %s", config.Port)
 	}
 }
 

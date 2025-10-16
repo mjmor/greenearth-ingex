@@ -8,34 +8,36 @@ import (
 
 // Config holds all configuration values for the ingest service
 type Config struct {
-	// WebSocket configuration
+	// SQLite configuration
+	SQLiteDBPath string
+
+	// WebSocket configuration (for future use)
 	TurboStreamURL string
 
 	// Elasticsearch configuration
-	ElasticsearchURL string
+	ElasticsearchURL    string
+	ElasticsearchAPIKey string
 
-	// Worker configuration
+	// Worker configuration (for future use)
 	WebSocketWorkers     int
 	ElasticsearchWorkers int
 	WorkerTimeout        time.Duration
 
 	// Logging configuration
 	LoggingEnabled bool
-
-	// Server configuration
-	Port string
 }
 
 // LoadConfig loads configuration from environment variables with defaults
 func LoadConfig() *Config {
 	return &Config{
-		TurboStreamURL:       getEnv("TURBOSTREAM_URL", "wss://graze.social/turbostream"),
-		ElasticsearchURL:     getEnv("ELASTICSEARCH_URL", "http://localhost:9200"),
+		SQLiteDBPath:         getEnv("SQLITE_DB_PATH", ""),
+		TurboStreamURL:       getEnv("TURBOSTREAM_URL", ""),
 		WebSocketWorkers:     getEnvInt("WEBSOCKET_WORKERS", 3),
+		ElasticsearchURL:     getEnv("ELASTICSEARCH_URL", ""),
+		ElasticsearchAPIKey:  getEnv("ELASTICSEARCH_API_KEY", ""),
 		ElasticsearchWorkers: getEnvInt("ELASTICSEARCH_WORKERS", 5),
 		WorkerTimeout:        getEnvDuration("WORKER_TIMEOUT", 30*time.Second),
 		LoggingEnabled:       getEnvBool("LOGGING_ENABLED", true),
-		Port:                 getEnv("PORT", "8080"),
 	}
 }
 

@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+// TODO: Use this multithreaded pipeline implementation in main.go
+// The current single-threaded SQLite processing in main.go should be refactored
+// to use this channel-based MessageProcessor architecture for concurrent processing
+// of messages from multiple data sources (WebSocket, local SQLite, S3-hosted SQLite)
+
 // MessageProcessor handles the processing of individual messages
 type MessageProcessor struct {
 	rawMessageChan       <-chan []byte

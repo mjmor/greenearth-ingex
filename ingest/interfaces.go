@@ -5,6 +5,12 @@ import (
 	"io"
 )
 
+// TODO: Abstract WebSocketClient to a general DataSource interface
+// The new DataSource interface should support multiple implementations:
+// - WebSocketDataSource (real-time streams)
+// - LocalSQLiteDataSource (local file ingestion)
+// - S3SQLiteDataSource (remote S3-hosted files)
+
 // WebSocketClient defines the interface for WebSocket connections
 type WebSocketClient interface {
 	// Connect establishes a WebSocket connection to the given URL
