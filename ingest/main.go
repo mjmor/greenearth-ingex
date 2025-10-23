@@ -144,6 +144,12 @@ func runIngestion(ctx context.Context, config *Config, logger *IngestLogger, sou
 				goto cleanup
 			}
 
+			if row.AtURI == "" {
+				logger.Error("Skipping row with empty at_uri from file %s (did: %s)", row.SourceFilename, row.DID)
+				skippedCount++
+				continue
+			}
+
 			msg := NewMegaStreamMessage(row.AtURI, row.DID, row.RawPost, row.Inferences, logger)
 
 			if msg.IsDelete() {
