@@ -7,7 +7,7 @@
 *.dll
 *.so
 *.dylib
-ingest
+ingest/ingest
 
 # Log files
 logs/
@@ -40,3 +40,4 @@ claude.md
 
 # MegaStream Test Data
 ingest/test_data/megastream
+ingest/test_data/parquet
