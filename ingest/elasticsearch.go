@@ -30,6 +30,7 @@ type TombstoneDoc struct {
 	AtURI     string `json:"at_uri"`
 	AuthorDID string `json:"author_did"`
 	DeletedAt string `json:"deleted_at"`
+	IndexedAt string `json:"indexed_at"`
 }
 
 // ElasticsearchConfig holds configuration for Elasticsearch connection
@@ -353,9 +354,17 @@ func CreateElasticsearchDoc(msg MegaStreamMessage) ElasticsearchDoc {
 
 // CreateTombstoneDoc creates a TombstoneDoc from a MegaStreamMessage
 func CreateTombstoneDoc(msg MegaStreamMessage) TombstoneDoc {
+	now := time.Now().UTC()
+	deletedAt := now
+
+	if timeUs := msg.GetTimeUs(); timeUs > 0 {
+		deletedAt = time.Unix(0, timeUs*1000)
+	}
+
 	return TombstoneDoc{
 		AtURI:     msg.GetAtURI(),
 		AuthorDID: msg.GetAuthorDID(),
-		DeletedAt: time.Now().UTC().Format(time.RFC3339),
+		DeletedAt: deletedAt.Format(time.RFC3339),
+		IndexedAt: now.Format(time.RFC3339),
 	}
 }

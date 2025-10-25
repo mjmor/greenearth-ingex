@@ -73,10 +73,18 @@ func TestDeleteMessageFlow(t *testing.T) {
 	if tombstoneDoc.DeletedAt == "" {
 		t.Error("Expected tombstone to have DeletedAt timestamp")
 	}
+	if tombstoneDoc.IndexedAt == "" {
+		t.Error("Expected tombstone to have IndexedAt timestamp")
+	}
 
 	_, err = time.Parse(time.RFC3339, tombstoneDoc.DeletedAt)
 	if err != nil {
 		t.Errorf("Expected tombstone DeletedAt to be valid RFC3339 timestamp, got error: %v", err)
+	}
+
+	_, err = time.Parse(time.RFC3339, tombstoneDoc.IndexedAt)
+	if err != nil {
+		t.Errorf("Expected tombstone IndexedAt to be valid RFC3339 timestamp, got error: %v", err)
 	}
 }
 
@@ -240,6 +248,82 @@ func TestBulkOperations_EmptyBatch(t *testing.T) {
 		err := bulkDelete(nil, nil, "posts", []string{}, false, logger)
 		if err != nil {
 			t.Errorf("Expected no error for empty batch, got: %v", err)
+		}
+	})
+}
+
+func TestTombstoneDoc_TimeUs(t *testing.T) {
+	logger := NewLogger(false)
+
+	t.Run("with time_us present", func(t *testing.T) {
+		timeUs := int64(1757450801618621)
+		deleteJSON := `{
+			"message": {
+				"time_us": 1757450801618621,
+				"commit": {
+					"operation": "delete"
+				}
+			}
+		}`
+
+		msg := NewMegaStreamMessage("at://test", "did:test", deleteJSON, "{}", logger)
+		if msg.GetTimeUs() != timeUs {
+			t.Errorf("Expected GetTimeUs() = %d, got %d", timeUs, msg.GetTimeUs())
+		}
+
+		tombstone := CreateTombstoneDoc(msg)
+
+		expectedDeletedAt := time.Unix(0, timeUs*1000).Format(time.RFC3339)
+		if tombstone.DeletedAt != expectedDeletedAt {
+			t.Errorf("Expected DeletedAt = %s, got %s", expectedDeletedAt, tombstone.DeletedAt)
+		}
+
+		if tombstone.IndexedAt == "" {
+			t.Error("Expected IndexedAt to be set")
+		}
+
+		indexedAt, err := time.Parse(time.RFC3339, tombstone.IndexedAt)
+		if err != nil {
+			t.Errorf("Expected IndexedAt to be valid RFC3339, got error: %v", err)
+		}
+
+		if time.Since(indexedAt) > time.Second {
+			t.Errorf("Expected IndexedAt to be recent, got %v", indexedAt)
+		}
+	})
+
+	t.Run("without time_us fallback to current time", func(t *testing.T) {
+		deleteJSON := `{
+			"message": {
+				"commit": {
+					"operation": "delete"
+				}
+			}
+		}`
+
+		msg := NewMegaStreamMessage("at://test", "did:test", deleteJSON, "{}", logger)
+		if msg.GetTimeUs() != 0 {
+			t.Errorf("Expected GetTimeUs() = 0, got %d", msg.GetTimeUs())
+		}
+
+		tombstone := CreateTombstoneDoc(msg)
+
+		deletedAt, err := time.Parse(time.RFC3339, tombstone.DeletedAt)
+		if err != nil {
+			t.Errorf("Expected DeletedAt to be valid RFC3339, got error: %v", err)
+		}
+
+		if time.Since(deletedAt) > time.Second {
+			t.Errorf("Expected DeletedAt to be recent (fallback to current time), got %v", deletedAt)
+		}
+
+		indexedAt, err := time.Parse(time.RFC3339, tombstone.IndexedAt)
+		if err != nil {
+			t.Errorf("Expected IndexedAt to be valid RFC3339, got error: %v", err)
+		}
+
+		if time.Since(indexedAt) > time.Second {
+			t.Errorf("Expected IndexedAt to be recent, got %v", indexedAt)
 		}
 	})
 }

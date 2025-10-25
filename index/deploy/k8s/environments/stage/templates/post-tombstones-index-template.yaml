@@ -25,6 +25,10 @@ data:
             "deleted_at": {
               "type": "date",
               "format": "iso8601"
+            },
+            "indexed_at": {
+              "type": "date",
+              "format": "iso8601"
             }
           }
         }
