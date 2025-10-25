@@ -75,14 +75,22 @@ func bulkIndex(ctx context.Context, client *elasticsearch.Client, index string, 
 	}
 
 	var buf bytes.Buffer
+	validDocCount := 0
 
 	for _, doc := range docs {
+		if doc.AtURI == "" {
+			logger.Error("Skipping document with empty at_uri (author_did: %s)", doc.AuthorDID)
+			continue
+		}
+
 		meta := map[string]interface{}{
 			"index": map[string]interface{}{
 				"_index": index,
 				"_id":    doc.AtURI,
 			},
 		}
+
+		validDocCount++
 
 		metaJSON, err := json.Marshal(meta)
 		if err != nil {
@@ -99,6 +107,11 @@ func bulkIndex(ctx context.Context, client *elasticsearch.Client, index string, 
 
 		buf.Write(docJSON)
 		buf.WriteByte('\n')
+	}
+
+	if validDocCount == 0 {
+		logger.Error("No valid documents to index (all had empty at_uri)")
+		return fmt.Errorf("no valid documents in batch")
 	}
 
 	res, err := client.Bulk(
