@@ -39,5 +39,5 @@ claude.md
 .claude/
 
 # MegaStream Test Data
-ingest/test_data/megastream
+ingest/test_data/graze
 ingest/test_data/parquet

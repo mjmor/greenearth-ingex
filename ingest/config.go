@@ -23,6 +23,14 @@ type Config struct {
 	ElasticsearchWorkers int
 	WorkerTimeout        time.Duration
 
+	// Spooler configuration
+	LocalSQLiteDBPath string
+	S3SQLiteDBBucket  string
+	S3SQLiteDBPrefix  string
+	SpoolIntervalSec  int
+	SpoolStateFile    string
+	AWSRegion         string
+
 	// Logging configuration
 	LoggingEnabled bool
 }
@@ -37,6 +45,12 @@ func LoadConfig() *Config {
 		ElasticsearchAPIKey:  getEnv("ELASTICSEARCH_API_KEY", ""),
 		ElasticsearchWorkers: getEnvInt("ELASTICSEARCH_WORKERS", 5),
 		WorkerTimeout:        getEnvDuration("WORKER_TIMEOUT", 30*time.Second),
+		LocalSQLiteDBPath:    getEnv("LOCAL_SQLITE_DB_PATH", ""),
+		S3SQLiteDBBucket:     getEnv("S3_SQLITE_DB_BUCKET", ""),
+		S3SQLiteDBPrefix:     getEnv("S3_SQLITE_DB_PREFIX", ""),
+		SpoolIntervalSec:     getEnvInt("SPOOL_INTERVAL_SEC", 60),
+		SpoolStateFile:       getEnv("SPOOL_STATE_FILE", ".processed_files.json"),
+		AWSRegion:            getEnv("AWS_REGION", "us-east-1"),
 		LoggingEnabled:       getEnvBool("LOGGING_ENABLED", true),
 	}
 }

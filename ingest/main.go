@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"flag"
 	"os"
 	"os/signal"
 	"syscall"
-
-	_ "modernc.org/sqlite"
+	"time"
 )
 
 // TODO: Move to multithreaded implementation
@@ -17,6 +15,8 @@ func main() {
 	// Parse command line flags
 	dryRun := flag.Bool("dry-run", false, "Run in dry-run mode (no writes to Elasticsearch)")
 	skipTLSVerify := flag.Bool("skip-tls-verify", false, "Skip TLS certificate verification (use for local development only)")
+	source := flag.String("source", "local", "Source of SQLite files: 'local' or 's3'")
+	mode := flag.String("mode", "once", "Ingestion mode: 'once' or 'spool'")
 	flag.Parse()
 
 	// Load configuration
@@ -26,23 +26,6 @@ func main() {
 	logger.Info("Green Earth Ingex - BlueSky Ingest Service")
 	if *dryRun {
 		logger.Info("Running in DRY-RUN mode - no writes to Elasticsearch")
-	}
-	logger.Info("Starting SQLite ingestion from Megastream database")
-
-	// Validate configuration
-	if config.SQLiteDBPath == "" {
-		logger.Error("SQLITE_DB_PATH environment variable is required")
-		os.Exit(1)
-	}
-
-	if config.ElasticsearchURL == "" {
-		logger.Error("ELASTICSEARCH_URL environment variable is required")
-		os.Exit(1)
-	}
-
-	if !*dryRun && config.ElasticsearchAPIKey == "" {
-		logger.Error("ELASTICSEARCH_API_KEY environment variable is required")
-		os.Exit(1)
 	}
 
 	// Create context with cancellation for graceful shutdown
@@ -58,11 +41,63 @@ func main() {
 		cancel()
 	}()
 
+	logger.Info("Starting SQLite ingestion (source: %s, mode: %s)", *source, *mode)
+	runIngestion(ctx, config, logger, *source, *mode, *dryRun, *skipTLSVerify)
+}
+
+func runIngestion(ctx context.Context, config *Config, logger *IngestLogger, source, mode string, dryRun, skipTLSVerify bool) {
+	// Validate source parameter
+	if source != "local" && source != "s3" {
+		logger.Error("Invalid source: %s (must be 'local' or 's3')", source)
+		os.Exit(1)
+	}
+
+	// Validate mode parameter
+	if mode != "once" && mode != "spool" {
+		logger.Error("Invalid mode: %s (must be 'once' or 'spool')", mode)
+		os.Exit(1)
+	}
+
+	// Validate Elasticsearch configuration
+	if config.ElasticsearchURL == "" {
+		logger.Error("ELASTICSEARCH_URL environment variable is required")
+		os.Exit(1)
+	}
+
+	if !dryRun && config.ElasticsearchAPIKey == "" {
+		logger.Error("ELASTICSEARCH_API_KEY environment variable is required")
+		os.Exit(1)
+	}
+
+	// Validate source-specific configuration
+	if source == "local" {
+		if config.LocalSQLiteDBPath == "" {
+			logger.Error("LOCAL_SQLITE_DB_PATH environment variable is required for local source")
+			os.Exit(1)
+		}
+	} else if source == "s3" {
+		if config.S3SQLiteDBBucket == "" {
+			logger.Error("S3_SQLITE_DB_BUCKET environment variable is required for s3 source")
+			os.Exit(1)
+		}
+		if config.S3SQLiteDBPrefix == "" {
+			logger.Error("S3_SQLITE_DB_PREFIX environment variable is required for s3 source")
+			os.Exit(1)
+		}
+	}
+
+	// Initialize state manager
+	stateManager, err := NewStateManager(config.SpoolStateFile, logger)
+	if err != nil {
+		logger.Error("Failed to initialize state manager: %v", err)
+		os.Exit(1)
+	}
+
 	// Initialize Elasticsearch client
 	esConfig := ElasticsearchConfig{
 		URL:           config.ElasticsearchURL,
 		APIKey:        config.ElasticsearchAPIKey,
-		SkipTLSVerify: *skipTLSVerify,
+		SkipTLSVerify: skipTLSVerify,
 	}
 
 	esClient, err := NewElasticsearchClient(esConfig, logger)
@@ -71,84 +106,85 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Open SQLite database
-	db, err := sql.Open("sqlite", config.SQLiteDBPath)
-	if err != nil {
-		logger.Error("Failed to open SQLite database: %v", err)
+	// Initialize spooler
+	var spooler Spooler
+	interval := time.Duration(config.SpoolIntervalSec) * time.Second
+
+	if source == "local" {
+		spooler = NewLocalSpooler(config.LocalSQLiteDBPath, mode, interval, stateManager, logger)
+	} else {
+		spooler, err = NewS3Spooler(config.S3SQLiteDBBucket, config.S3SQLiteDBPrefix, config.AWSRegion, mode, interval, stateManager, logger)
+		if err != nil {
+			logger.Error("Failed to create S3 spooler: %v", err)
+			os.Exit(1)
+		}
+	}
+
+	// Start spooler
+	if err := spooler.Start(ctx); err != nil {
+		logger.Error("Failed to start spooler: %v", err)
 		os.Exit(1)
 	}
-	defer db.Close()
 
-	logger.Info("Opened SQLite database: %s", config.SQLiteDBPath)
-
-	// Query enriched_posts table
-	rows, err := db.QueryContext(ctx, `
-		SELECT at_uri, did, raw_post, inferences
-		FROM enriched_posts
-	`)
-	if err != nil {
-		logger.Error("Failed to query enriched_posts: %v", err)
-		os.Exit(1)
-	}
-	defer rows.Close()
-
-	// Process rows and bulk index to Elasticsearch
+	// Process rows from spooler
+	rowChan := spooler.GetRowChannel()
 	var batch []ElasticsearchDoc
 	const batchSize = 100
 	processedCount := 0
 	skippedCount := 0
 
-	for rows.Next() {
+	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("Shutdown signal received, stopping ingestion")
 			goto cleanup
-		default:
-		}
-
-		var atURI, did, rawPostJSON, inferencesJSON string
-		if err := rows.Scan(&atURI, &did, &rawPostJSON, &inferencesJSON); err != nil {
-			logger.Error("Failed to scan row: %v", err)
-			continue
-		}
-
-		msg := NewMegaStreamMessage(atURI, did, rawPostJSON, inferencesJSON, logger)
-
-		// TODO: Handle post deletions in Elasticsearch instead of skipping
-		// We should delete or mark as deleted in ES when operation == "delete"
-		if msg.IsDelete() {
-			skippedCount++
-			continue
-		}
-
-		doc := CreateElasticsearchDoc(msg)
-
-		batch = append(batch, doc)
-
-		// Bulk index when batch is full
-		if len(batch) >= batchSize {
-			if err := bulkIndex(ctx, esClient, "posts", batch, *dryRun, logger); err != nil {
-				logger.Error("Failed to bulk index batch: %v", err)
-			} else {
-				processedCount += len(batch)
-				if *dryRun {
-					logger.Info("Dry-run: Would index batch: %d documents (total: %d, skipped: %d)", len(batch), processedCount, skippedCount)
-				} else {
-					logger.Info("Indexed batch: %d documents (total: %d, skipped: %d)", len(batch), processedCount, skippedCount)
-				}
+		case row, ok := <-rowChan:
+			if !ok {
+				logger.Info("Spooler channel closed, finishing remaining batch")
+				goto cleanup
 			}
-			batch = batch[:0]
+
+			if row.AtURI == "" {
+				logger.Error("Skipping row with empty at_uri from file %s (did: %s)", row.SourceFilename, row.DID)
+				skippedCount++
+				continue
+			}
+
+			msg := NewMegaStreamMessage(row.AtURI, row.DID, row.RawPost, row.Inferences, logger)
+
+			if msg.IsDelete() {
+				skippedCount++
+				continue
+			}
+
+			doc := CreateElasticsearchDoc(msg)
+			batch = append(batch, doc)
+
+			// Bulk index when batch is full
+			if len(batch) >= batchSize {
+				if err := bulkIndex(ctx, esClient, "posts", batch, dryRun, logger); err != nil {
+					logger.Error("Failed to bulk index batch: %v", err)
+				} else {
+					processedCount += len(batch)
+					if dryRun {
+						logger.Info("Dry-run: Would index batch: %d documents (total: %d, skipped: %d)", len(batch), processedCount, skippedCount)
+					} else {
+						logger.Info("Indexed batch: %d documents (total: %d, skipped: %d)", len(batch), processedCount, skippedCount)
+					}
+				}
+				batch = batch[:0]
+			}
 		}
 	}
 
 cleanup:
 	// Index remaining documents in batch
 	if len(batch) > 0 {
-		if err := bulkIndex(ctx, esClient, "posts", batch, *dryRun, logger); err != nil {
+		if err := bulkIndex(ctx, esClient, "posts", batch, dryRun, logger); err != nil {
 			logger.Error("Failed to bulk index final batch: %v", err)
 		} else {
 			processedCount += len(batch)
-			if *dryRun {
+			if dryRun {
 				logger.Info("Dry-run: Would index final batch: %d documents", len(batch))
 			} else {
 				logger.Info("Indexed final batch: %d documents", len(batch))
@@ -156,10 +192,5 @@ cleanup:
 		}
 	}
 
-	if err := rows.Err(); err != nil {
-		logger.Error("Error iterating rows: %v", err)
-		os.Exit(1)
-	}
-
-	logger.Info("Ingestion complete. Processed: %d, Skipped: %d", processedCount, skippedCount)
+	logger.Info("Spooler ingestion complete. Processed: %d, Skipped: %d", processedCount, skippedCount)
 }
